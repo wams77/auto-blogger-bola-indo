@@ -129,7 +129,7 @@ def tulis_artikel_dengan_gemini(berita):
     
     Syarat penulisan:
     1. Buat Judul baru yang sangat clickbait, heboh, namun tetap relevan dengan isi berita dan tidak hoaks.
-    2. Tulis isi artikel minimal 3 paragraf dengan gaya bahasa asyik ala komentator bola Indonesia (boleh pakai istilah seperti 'menggetarkan jala', 'taktik jitu', dll).
+    2. Tulis isi artikel minimal 8 paragraf dengan gaya bahasa asyik ala komentator bola Indonesia (boleh pakai istilah seperti 'menggetarkan jala', 'taktik jitu', dll).
     3. Format artikel harus menggunakan tag HTML (seperti <h2>, <p>, <strong>, <em>) agar siap diposting di Blogger.
     4. Jangan masukkan tag <html>, <head>, atau <body>, cukup isi artikelnya saja.
     5. Berikan kredit sumber berita di akhir artikel dengan format HTML link (Sumber: <a href="{berita['link']}">{berita['link']}</a>).
