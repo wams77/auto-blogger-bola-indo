@@ -50,13 +50,14 @@ except Exception as e:
     print(f"⚠️ Gagal menginisialisasi Indexing API: {e}")
 
 # ==========================================
-# 2. DAFTAR SUMBER RSS (SEPAKBOLA INDONESIA & DUNIA)
+# 2. DAFTAR SUMBER RSS (GOOGLE NEWS INDONESIA)
 # ==========================================
+# Mengambil berita bola terbaru dalam 24 jam terakhir (when:1d) langsung dari Google News
 RSS_FEEDS = [
-    "https://www.bola.net/feed/",
-    "https://www.bolasport.com/rss",
-    "https://sports.okezone.com/rss/bola",
-    "https://www.viva.co.id/rss/bola"
+    "https://news.google.com/rss/search?q=Timnas+Indonesia+when:1d&hl=id&gl=ID&ceid=ID:id",
+    "https://news.google.com/rss/search?q=Liga+1+Indonesia+when:1d&hl=id&gl=ID&ceid=ID:id",
+    "https://news.google.com/rss/search?q=Transfer+Pemain+Bola+Indonesia+when:1d&hl=id&gl=ID&ceid=ID:id",
+    "https://news.google.com/rss/search?q=PSSI+when:1d&hl=id&gl=ID&ceid=ID:id"
 ]
 
 # ==========================================
