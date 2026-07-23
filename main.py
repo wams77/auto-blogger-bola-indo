@@ -50,13 +50,13 @@ except Exception as e:
     print(f"⚠️ Gagal menginisialisasi Indexing API: {e}")
 
 # ==========================================
-# 2. DAFTAR SUMBER RSS (SEPAKBOLA INDONESIA)
+# 2. DAFTAR SUMBER RSS (SEPAKBOLA INDONESIA & DUNIA)
 # ==========================================
 RSS_FEEDS = [
-    "https://www.suara.com/rss/bola",
-    "https://sindonews.com/feed/soccer",
-    "https://www.cnnindonesia.com/olahraga/rss",
-    "https://www.republika.co.id/rss/sepakbola"
+    "https://www.bola.net/feed/",
+    "https://www.bolasport.com/rss",
+    "https://sports.okezone.com/rss/bola",
+    "https://www.viva.co.id/rss/bola"
 ]
 
 # ==========================================
