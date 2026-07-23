@@ -54,17 +54,22 @@ except Exception as e:
 # ==========================================
 # 2. SUMBER BERITA (DIBAGI 2 KATEGORI)
 # ==========================================
-# Menggunakan Google News agar anti-blokir dan mendapatkan berita terbaru (1 hari terakhir)
 RSS_FEEDS = {
     "Sepakbola Nasional": [
+        # Sumber Utama: Google News (Anti-Blokir & Paling Update)
         "https://news.google.com/rss/search?q=Timnas+Indonesia+when:1d&hl=id&gl=ID&ceid=ID:id",
         "https://news.google.com/rss/search?q=Liga+1+Indonesia+when:1d&hl=id&gl=ID&ceid=ID:id",
-        "https://news.google.com/rss/search?q=Transfer+Pemain+Liga+1+when:1d&hl=id&gl=ID&ceid=ID:id"
+        # Sumber Tambahan: Bing News & Antara (Aman dari pemblokiran server GitHub)
+        "https://www.bing.com/news/search?q=Timnas+Indonesia+OR+Liga+1+Indonesia&format=rss",
+        "https://www.antaranews.com/rss/olahraga.xml"
     ],
     "Sepakbola Dunia": [
-        "https://news.google.com/rss/search?q=Liga+Inggris+OR+Manchester+United+OR+Arsenal+when:1d&hl=id&gl=ID&ceid=ID:id",
-        "https://news.google.com/rss/search?q=Real+Madrid+OR+Barcelona+OR+Liga+Spanyol+when:1d&hl=id&gl=ID&ceid=ID:id",
-        "https://news.google.com/rss/search?q=Liga+Champions+OR+Bursa+Transfer+Eropa+when:1d&hl=id&gl=ID&ceid=ID:id"
+        # Sumber Utama: Google News (Anti-Blokir & Paling Update)
+        "https://news.google.com/rss/search?q=Liga+Inggris+OR+Liga+Champions+when:1d&hl=id&gl=ID&ceid=ID:id",
+        "https://news.google.com/rss/search?q=Real+Madrid+OR+Barcelona+when:1d&hl=id&gl=ID&ceid=ID:id",
+        # Sumber Tambahan: Media Olahraga Internasional Terbesar (Berita Tangan Pertama)
+        "https://feeds.bbci.co.uk/sport/football/rss.xml",
+        "https://www.skysports.com/rss/12040"
     ]
 }
 
