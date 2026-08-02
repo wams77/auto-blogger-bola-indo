@@ -2,22 +2,21 @@ import os
 import time
 import feedparser
 import urllib.parse
-import requests  # <-- LIBRARY BARU UNTUK FACEBOOK
-import google.generativeai as genai
+import requests
+from groq import Groq # <-- LIBRARY GROQ
 from google.oauth2.credentials import Credentials
 from google.oauth2 import service_account
 from google.auth.transport.requests import Request
 from googleapiclient.discovery import build
-from google.api_core.exceptions import ResourceExhausted
 import sys
 
 # ==========================================
 # 1. KONFIGURASI KREDENSIAL & API
 # ==========================================
-GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
-genai.configure(api_key=GEMINI_API_KEY)
-
-model = genai.GenerativeModel('gemini-1.5-flash')
+# Konfigurasi Groq
+GROQ_API_KEY = os.environ.get("GROQ_API_KEY")
+groq_client = Groq(api_key=GROQ_API_KEY)
+GROQ_MODEL = "llama3-70b-8192" # Menggunakan model LLaMA 3 (70 Miliar Parameter)
 
 BLOG_ID = os.environ.get("BLOG_ID")
 SCOPES = ['https://www.googleapis.com/auth/blogger']
@@ -26,7 +25,6 @@ TOKEN_FILE = 'token.json'
 INDEXING_SCOPES = ['https://www.googleapis.com/auth/indexing']
 INDEXING_KEY_FILE = 'service_account.json'
 
-# Token Facebook dari GitHub Secrets
 FB_ACCESS_TOKEN = os.environ.get("FB_ACCESS_TOKEN")
 FB_PAGE_ID = os.environ.get("FB_PAGE_ID")
 
@@ -57,7 +55,7 @@ except Exception as e:
     print(f"⚠️ Gagal menginisialisasi Indexing API: {e}")
 
 # ==========================================
-# 2. SUMBER BERITA (DIBAGI 2 KATEGORI)
+# 2. SUMBER BERITA 
 # ==========================================
 RSS_FEEDS = {
     "Sepakbola Nasional": [
@@ -131,7 +129,8 @@ def dapatkan_berita_dari_rss(kategori_rss, limit_per_sumber=2):
                 print(f"Gagal membaca RSS {url}: {e}")
     return semua_berita
 
-def tulis_artikel_dengan_gemini(berita):
+def tulis_artikel_dengan_groq(berita):
+    """Menulis artikel menggunakan Groq API (LLaMA 3)"""
     konteks = "sepakbola Indonesia (seperti Timnas, Liga 1, pemain keturunan, dll)" if berita['kategori'] == 'Sepakbola Nasional' else "sepakbola mancanegara (Liga Top Eropa, Liga Champions, superstar dunia, dll)"
     
     prompt = f"""
@@ -153,15 +152,21 @@ def tulis_artikel_dengan_gemini(berita):
     
     for attempt in range(3):
         try:
-            response = model.generate_content(prompt)
-            return response.text
-        except ResourceExhausted:
-            wait_time = (attempt + 1) * 30
-            print(f"⚠️ Limit API Gemini tercapai. Menunggu {wait_time} detik...")
-            time.sleep(wait_time)
+            chat_completion = groq_client.chat.completions.create(
+                messages=[
+                    {
+                        "role": "user",
+                        "content": prompt,
+                    }
+                ],
+                model=GROQ_MODEL,
+                temperature=0.7,
+            )
+            return chat_completion.choices[0].message.content
         except Exception as e:
-            print(f"Error saat memanggil Gemini: {e}")
-            return None
+            wait_time = (attempt + 1) * 30
+            print(f"⚠️ Error/Limit API Groq: {e}. Menunggu {wait_time} detik...")
+            time.sleep(wait_time)
             
     return None
 
@@ -190,20 +195,17 @@ def posting_ke_blogger(judul, konten_html, label_kategori):
             except Exception as idx_err:
                 print(f"⚠️ [AUTO-INDEX] Gagal submit ke Google Search: {idx_err}")
                 
-        return post_url # PENTING: Mengembalikan URL untuk dipakai di Facebook
+        return post_url 
     except Exception as e:
         print(f"❌ Gagal memposting ke Blogger: {e}")
         return None
 
 def posting_ke_facebook(judul, url_artikel):
-    """Fungsi untuk membagikan tautan artikel yang baru diposting ke Facebook Page."""
     if not FB_ACCESS_TOKEN or not FB_PAGE_ID:
         print("⚠️ Rahasia FB_ACCESS_TOKEN atau FB_PAGE_ID tidak ditemukan. Melewati auto-post FB.")
         return
 
-    # Anda bisa memodifikasi emoji dan kalimat pengantar di sini
     pesan_status = f"🔥 Berita Terpanas Baru Saja Rilis!\n\n{judul}\n\nBaca selengkapnya di sini 👇"
-
     url_api = f"https://graph.facebook.com/v19.0/{FB_PAGE_ID}/feed"
     payload = {
         'message': pesan_status,
@@ -224,7 +226,7 @@ def posting_ke_facebook(judul, url_artikel):
 # 4. EKSEKUSI PROGRAM
 # ==========================================
 def main():
-    print("=== Memulai Auto-Blogger Sepakbola (Nasional & Dunia) + Auto FB ===")
+    print("=== Memulai Auto-Blogger Sepakbola (Didukung oleh Groq AI) ===")
     
     riwayat_postingan = ambil_riwayat_postingan()
     link_sesi_ini = set() 
@@ -250,10 +252,10 @@ def main():
             
         link_sesi_ini.add(berita['link'])
 
-        hasil_gemini = tulis_artikel_dengan_gemini(berita)
+        hasil_ai = tulis_artikel_dengan_groq(berita)
         
-        if hasil_gemini:
-            baris_teks = hasil_gemini.split('\n')
+        if hasil_ai:
+            baris_teks = hasil_ai.split('\n')
             judul_baru = baris_teks[0].replace('<h1>', '').replace('</h1>', '').replace('##', '').replace('**', '').strip()
             konten_artikel = '\n'.join(baris_teks[1:]).replace('```html', '').replace('```', '')
             
@@ -270,14 +272,12 @@ def main():
             """
             konten_artikel = konten_artikel + kode_iklan
 
-            # 1. Posting ke Blogger dan tangkap URL-nya
             post_url = posting_ke_blogger(judul_baru, konten_artikel, berita['kategori'])
             
-            # 2. Jika sukses terposting di Blogger, bagikan langsung ke Facebook
             if post_url:
                 posting_ke_facebook(judul_baru, post_url)
             
-            print("⏳ Menunggu 20 detik sebelum memproses berita selanjutnya (Anti-Limit)...")
+            print("⏳ Menunggu 20 detik sebelum memproses berita selanjutnya...")
             time.sleep(20)
         else:
             print(f"Gagal di-generate, melewati artikel: {berita['judul']}")
