@@ -1,7 +1,8 @@
-name: Auto Blogger Bot Gosip
+name: Auto Blogger Bot Sepakbola
 
 on:
   schedule:
+    # Berjalan otomatis setiap hari pada pukul 09:00 WITA (01:00 UTC)
     - cron: '0 1 * * *'
   workflow_dispatch:
 
@@ -33,4 +34,6 @@ jobs:
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           BLOG_ID: ${{ secrets.BLOG_ID }}
+          FB_ACCESS_TOKEN: ${{ secrets.FB_ACCESS_TOKEN }}
+          FB_PAGE_ID: ${{ secrets.FB_PAGE_ID }}
         run: python main.py
