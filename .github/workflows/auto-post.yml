@@ -36,42 +36,4 @@ jobs:
           BLOG_ID: ${{ secrets.BLOG_ID }}
           FB_ACCESS_TOKEN: ${{ secrets.FB_ACCESS_TOKEN }}
           FB_PAGE_ID: ${{ secrets.FB_PAGE_ID }}
-        run: python main.pyname: Auto Blogger Bot Sepakbola
-
-on:
-  schedule:
-    # Berjalan otomatis setiap hari pada pukul 09:00 WITA (01:00 UTC)
-    - cron: '0 1 * * *'
-  workflow_dispatch:
-
-jobs:
-  build:
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
-
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11' 
-
-      - name: Install Dependencies
-        run: pip install -r requirements.txt
-
-      - name: Buat file Token JSON & Service Account
-        env:
-          BLOGGER_TOKEN: ${{ secrets.BLOGGER_TOKEN }}
-          INDEXING_KEY: ${{ secrets.INDEXING_KEY }}
-        run: |
-          echo "$BLOGGER_TOKEN" > token.json
-          echo "$INDEXING_KEY" > service_account.json
-
-      - name: Jalankan Script Auto-Blogger
-        env:
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-          BLOG_ID: ${{ secrets.BLOG_ID }}
-          FB_ACCESS_TOKEN: ${{ secrets.FB_ACCESS_TOKEN }}
-          FB_PAGE_ID: ${{ secrets.FB_PAGE_ID }}
         run: python main.py
