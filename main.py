@@ -2,6 +2,7 @@ import os
 import time
 import feedparser
 import urllib.parse
+import requests  # <-- LIBRARY BARU UNTUK FACEBOOK
 import google.generativeai as genai
 from google.oauth2.credentials import Credentials
 from google.oauth2 import service_account
@@ -16,7 +17,7 @@ import sys
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 genai.configure(api_key=GEMINI_API_KEY)
 
-model = genai.GenerativeModel('gemini-3.5-flash')
+model = genai.GenerativeModel('gemini-1.5-flash')
 
 BLOG_ID = os.environ.get("BLOG_ID")
 SCOPES = ['https://www.googleapis.com/auth/blogger']
@@ -24,6 +25,10 @@ TOKEN_FILE = 'token.json'
 
 INDEXING_SCOPES = ['https://www.googleapis.com/auth/indexing']
 INDEXING_KEY_FILE = 'service_account.json'
+
+# Token Facebook dari GitHub Secrets
+FB_ACCESS_TOKEN = os.environ.get("FB_ACCESS_TOKEN")
+FB_PAGE_ID = os.environ.get("FB_PAGE_ID")
 
 # --- Inisialisasi Blogger API ---
 try:
@@ -56,18 +61,14 @@ except Exception as e:
 # ==========================================
 RSS_FEEDS = {
     "Sepakbola Nasional": [
-        # Sumber Utama: Google News (Anti-Blokir & Paling Update)
         "https://news.google.com/rss/search?q=Timnas+Indonesia+when:1d&hl=id&gl=ID&ceid=ID:id",
         "https://news.google.com/rss/search?q=Liga+1+Indonesia+when:1d&hl=id&gl=ID&ceid=ID:id",
-        # Sumber Tambahan: Bing News & Antara (Aman dari pemblokiran server GitHub)
         "https://www.bing.com/news/search?q=Timnas+Indonesia+OR+Liga+1+Indonesia&format=rss",
         "https://www.antaranews.com/rss/olahraga.xml"
     ],
     "Sepakbola Dunia": [
-        # Sumber Utama: Google News (Anti-Blokir & Paling Update)
         "https://news.google.com/rss/search?q=Liga+Inggris+OR+Liga+Champions+when:1d&hl=id&gl=ID&ceid=ID:id",
         "https://news.google.com/rss/search?q=Real+Madrid+OR+Barcelona+when:1d&hl=id&gl=ID&ceid=ID:id",
-        # Sumber Tambahan: Media Olahraga Internasional Terbesar (Berita Tangan Pertama)
         "https://feeds.bbci.co.uk/sport/football/rss.xml",
         "https://www.skysports.com/rss/12040"
     ]
@@ -112,7 +113,6 @@ def dapatkan_berita_dari_rss(kategori_rss, limit_per_sumber=2):
                                     break
                         
                         if not gambar_url:
-                            # PROMPT GAMBAR KHUSUS SEPAKBOLA
                             prompt_gambar = f"High quality cinematic sports photography, professional football match action, dramatic lighting, illustration of: {entry.title}"
                             prompt_aman = urllib.parse.quote(prompt_gambar)
                             gambar_url = f"https://image.pollinations.ai/prompt/{prompt_aman}?width=800&height=400&nologo=true"
@@ -124,7 +124,7 @@ def dapatkan_berita_dari_rss(kategori_rss, limit_per_sumber=2):
                         'link': link_asli,
                         'deskripsi': entry.get('summary', entry.get('description', '')),
                         'gambar': gambar_url,
-                        'kategori': kategori # <-- Menyimpan label kategori
+                        'kategori': kategori 
                     }
                     semua_berita.append(berita)
             except Exception as e:
@@ -132,7 +132,6 @@ def dapatkan_berita_dari_rss(kategori_rss, limit_per_sumber=2):
     return semua_berita
 
 def tulis_artikel_dengan_gemini(berita):
-    # Mengubah gaya bahasa bot berdasarkan dari mana berita itu berasal
     konteks = "sepakbola Indonesia (seperti Timnas, Liga 1, pemain keturunan, dll)" if berita['kategori'] == 'Sepakbola Nasional' else "sepakbola mancanegara (Liga Top Eropa, Liga Champions, superstar dunia, dll)"
     
     prompt = f"""
@@ -146,7 +145,7 @@ def tulis_artikel_dengan_gemini(berita):
     
     Syarat penulisan:
     1. Buat Judul baru yang sangat clickbait, heboh, namun tetap relevan dengan isi berita dan tidak hoaks.
-    2. Tulis isi artikel minimal 8 paragraf dengan gaya bahasa asyik ala komentator bola (boleh pakai istilah seperti 'menggetarkan jala', 'taktik jitu', dll).
+    2. Tulis isi artikel minimal 3 paragraf dengan gaya bahasa asyik ala komentator bola (boleh pakai istilah seperti 'menggetarkan jala', 'taktik jitu', dll).
     3. Format artikel harus menggunakan tag HTML (seperti <h2>, <p>, <strong>, <em>) agar siap diposting di Blogger.
     4. Jangan masukkan tag <html>, <head>, atau <body>, cukup isi artikelnya saja.
     5. Berikan kredit sumber berita di akhir artikel dengan format HTML link (Sumber: <a href="{berita['link']}">{berita['link']}</a>).
@@ -169,9 +168,8 @@ def tulis_artikel_dengan_gemini(berita):
 def posting_ke_blogger(judul, konten_html, label_kategori):
     if not BLOG_ID:
         print("❌ BLOG_ID tidak ditemukan!")
-        return
+        return None
 
-    # LABEL OTOMATIS MENGIKUTI KATEGORI RSS
     post_body = {
         'title': judul,
         'content': konten_html,
@@ -192,26 +190,52 @@ def posting_ke_blogger(judul, konten_html, label_kategori):
             except Exception as idx_err:
                 print(f"⚠️ [AUTO-INDEX] Gagal submit ke Google Search: {idx_err}")
                 
+        return post_url # PENTING: Mengembalikan URL untuk dipakai di Facebook
     except Exception as e:
         print(f"❌ Gagal memposting ke Blogger: {e}")
+        return None
+
+def posting_ke_facebook(judul, url_artikel):
+    """Fungsi untuk membagikan tautan artikel yang baru diposting ke Facebook Page."""
+    if not FB_ACCESS_TOKEN or not FB_PAGE_ID:
+        print("⚠️ Rahasia FB_ACCESS_TOKEN atau FB_PAGE_ID tidak ditemukan. Melewati auto-post FB.")
+        return
+
+    # Anda bisa memodifikasi emoji dan kalimat pengantar di sini
+    pesan_status = f"🔥 Berita Terpanas Baru Saja Rilis!\n\n{judul}\n\nBaca selengkapnya di sini 👇"
+
+    url_api = f"https://graph.facebook.com/v19.0/{FB_PAGE_ID}/feed"
+    payload = {
+        'message': pesan_status,
+        'link': url_artikel,
+        'access_token': FB_ACCESS_TOKEN
+    }
+
+    try:
+        response = requests.post(url_api, data=payload)
+        if response.status_code == 200:
+            print("✅ [AUTO-SOSMED] Sukses membagikan tautan ke Halaman Facebook!")
+        else:
+            print(f"⚠️ [AUTO-SOSMED] Gagal memposting ke Facebook: {response.text}")
+    except Exception as e:
+        print(f"❌ [AUTO-SOSMED] Error saat menghubungi Facebook API: {e}")
 
 # ==========================================
 # 4. EKSEKUSI PROGRAM
 # ==========================================
 def main():
-    print("=== Memulai Auto-Blogger Sepakbola (Nasional & Dunia) ===")
+    print("=== Memulai Auto-Blogger Sepakbola (Nasional & Dunia) + Auto FB ===")
     
     riwayat_postingan = ambil_riwayat_postingan()
     link_sesi_ini = set() 
     
-    # Memanggil fungsi RSS yang baru
     daftar_berita = dapatkan_berita_dari_rss(RSS_FEEDS, limit_per_sumber=2)
     print(f"Ditemukan total {len(daftar_berita)} berita bola dari RSS.")
     
     for index, berita in enumerate(daftar_berita):
         print(f"\n[{index + 1}/{len(daftar_berita)}] Mengecek berita [{berita['kategori']}]: {berita['judul']}")
         
-        tag_pelacak = f"<!-- PELACAK_SUMBER: {berita['link']} -->"
+        tag_pelacak = f""
         link_pelacak = f'href="{berita["link"]}"'
         
         sudah_diposting = False
@@ -246,8 +270,12 @@ def main():
             """
             konten_artikel = konten_artikel + kode_iklan
 
-            # Mengirimkan kategori label ke Blogger
-            posting_ke_blogger(judul_baru, konten_artikel, berita['kategori'])
+            # 1. Posting ke Blogger dan tangkap URL-nya
+            post_url = posting_ke_blogger(judul_baru, konten_artikel, berita['kategori'])
+            
+            # 2. Jika sukses terposting di Blogger, bagikan langsung ke Facebook
+            if post_url:
+                posting_ke_facebook(judul_baru, post_url)
             
             print("⏳ Menunggu 20 detik sebelum memproses berita selanjutnya (Anti-Limit)...")
             time.sleep(20)
