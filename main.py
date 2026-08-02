@@ -205,7 +205,10 @@ def posting_ke_facebook(judul, url_artikel):
         print("⚠️ Rahasia FB_ACCESS_TOKEN atau FB_PAGE_ID tidak ditemukan. Melewati auto-post FB.")
         return
 
-    pesan_status = f"🔥 Berita Terpanas Baru Saja Rilis!\n\n{judul}\n\nBaca selengkapnya di sini 👇"
+    # --- BAGIAN YANG DIUBAH (Menambahkan tulisan Sumber) ---
+    pesan_status = f"🔥 Berita Terpanas Baru Saja Rilis!\n\n{judul}\n\n🔗 Sumber Berita: {url_artikel}\n\nBaca selengkapnya di link bawah ini 👇"
+    # -------------------------------------------------------
+
     url_api = f"https://graph.facebook.com/v19.0/{FB_PAGE_ID}/feed"
     payload = {
         'message': pesan_status,
