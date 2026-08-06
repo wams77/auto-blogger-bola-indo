@@ -3,7 +3,7 @@ import time
 import feedparser
 import urllib.parse
 import requests
-from groq import Groq # <-- LIBRARY GROQ
+from groq import Groq 
 from google.oauth2.credentials import Credentials
 from google.oauth2 import service_account
 from google.auth.transport.requests import Request
@@ -13,20 +13,20 @@ import sys
 # ==========================================
 # 1. KONFIGURASI KREDENSIAL & API
 # ==========================================
-# Konfigurasi Groq
 GROQ_API_KEY = os.environ.get("GROQ_API_KEY")
 groq_client = Groq(api_key=GROQ_API_KEY)
-GROQ_MODEL = "llama3-70b-8192" # Menggunakan model LLaMA 3 (70 Miliar Parameter)
+GROQ_MODEL = "llama3-70b-8192" 
 
 BLOG_ID = os.environ.get("BLOG_ID")
 SCOPES = ['https://www.googleapis.com/auth/blogger']
 TOKEN_FILE = 'token.json'
-
 INDEXING_SCOPES = ['https://www.googleapis.com/auth/indexing']
 INDEXING_KEY_FILE = 'service_account.json'
 
 FB_ACCESS_TOKEN = os.environ.get("FB_ACCESS_TOKEN")
 FB_PAGE_ID = os.environ.get("FB_PAGE_ID")
+
+HISTORY_FILE = 'history.txt' # File penyimpan riwayat
 
 # --- Inisialisasi Blogger API ---
 try:
@@ -50,12 +50,12 @@ try:
         indexing_service = build('indexing', 'v3', credentials=idx_creds)
         print("✅ Google Indexing API siap digunakan.")
     else:
-        print("⚠️ File service_account.json tidak ditemukan. Melewati fitur Auto-Indexing.")
+        print("⚠️ File service_account.json tidak ditemukan.")
 except Exception as e:
     print(f"⚠️ Gagal menginisialisasi Indexing API: {e}")
 
 # ==========================================
-# 2. SUMBER BERITA 
+# 2. SUMBER BERITA (DIBAGI 2 KATEGORI)
 # ==========================================
 RSS_FEEDS = {
     "Sepakbola Nasional": [
@@ -75,20 +75,17 @@ RSS_FEEDS = {
 # ==========================================
 # 3. FUNGSI UTAMA
 # ==========================================
-def ambil_riwayat_postingan():
-    riwayat_konten = []
-    if not BLOG_ID:
-        return riwayat_konten
-    try:
-        request = blogger_service.posts().list(blogId=BLOG_ID, maxResults=30, status='LIVE')
-        response = request.execute()
-        posts = response.get('items', [])
-        for post in posts:
-            riwayat_konten.append(post.get('content', ''))
-        print(f"🔍 Sistem Anti-Duplikat aktif: Memeriksa {len(posts)} artikel AKTIF terdahulu.")
-    except Exception as e:
-        print(f"⚠️ Gagal mengambil riwayat artikel: {e}")
-    return riwayat_konten
+def muat_riwayat_lokal():
+    """Membaca file history.txt jika ada."""
+    if os.path.exists(HISTORY_FILE):
+        with open(HISTORY_FILE, 'r', encoding='utf-8') as f:
+            return set(line.strip() for line in f if line.strip())
+    return set()
+
+def simpan_riwayat_lokal(link):
+    """Menyimpan link ke file history.txt."""
+    with open(HISTORY_FILE, 'a', encoding='utf-8') as f:
+        f.write(f"{link}\n")
 
 def dapatkan_berita_dari_rss(kategori_rss, limit_per_sumber=2):
     semua_berita = []
@@ -130,7 +127,6 @@ def dapatkan_berita_dari_rss(kategori_rss, limit_per_sumber=2):
     return semua_berita
 
 def tulis_artikel_dengan_groq(berita):
-    """Menulis artikel menggunakan Groq API (LLaMA 3)"""
     konteks = "sepakbola Indonesia (seperti Timnas, Liga 1, pemain keturunan, dll)" if berita['kategori'] == 'Sepakbola Nasional' else "sepakbola mancanegara (Liga Top Eropa, Liga Champions, superstar dunia, dll)"
     
     prompt = f"""
@@ -144,21 +140,16 @@ def tulis_artikel_dengan_groq(berita):
     
     Syarat penulisan:
     1. Buat Judul baru yang sangat clickbait, heboh, namun tetap relevan dengan isi berita dan tidak hoaks.
-    2. Tulis isi artikel minimal 3 paragraf dengan gaya bahasa asyik ala komentator bola (boleh pakai istilah seperti 'menggetarkan jala', 'taktik jitu', dll).
-    3. Format artikel harus menggunakan tag HTML (seperti <h2>, <p>, <strong>, <em>) agar siap diposting di Blogger.
+    2. Tulis isi artikel minimal 3 paragraf dengan gaya bahasa asyik ala komentator bola.
+    3. Format artikel harus menggunakan tag HTML (seperti <h2>, <p>, <strong>, <em>).
     4. Jangan masukkan tag <html>, <head>, atau <body>, cukup isi artikelnya saja.
-    5. Berikan kredit sumber berita di akhir artikel dengan format HTML link (Sumber: <a href="{berita['link']}">{berita['link']}</a>).
+    5. Berikan kredit sumber berita di akhir artikel (Sumber: <a href="{berita['link']}">{berita['link']}</a>).
     """
     
     for attempt in range(3):
         try:
             chat_completion = groq_client.chat.completions.create(
-                messages=[
-                    {
-                        "role": "user",
-                        "content": prompt,
-                    }
-                ],
+                messages=[{"role": "user", "content": prompt}],
                 model=GROQ_MODEL,
                 temperature=0.7,
             )
@@ -185,13 +176,13 @@ def posting_ke_blogger(judul, konten_html, label_kategori):
         request = blogger_service.posts().insert(blogId=BLOG_ID, body=post_body)
         response = request.execute()
         post_url = response.get('url')
-        print(f"✅ Sukses memposting dengan label '{label_kategori}': {post_url}")
+        print(f"✅ Sukses memposting ke Blogger dengan label '{label_kategori}': {post_url}")
 
         if indexing_service and post_url:
             try:
                 notification = {'url': post_url, 'type': 'URL_UPDATED'}
                 indexing_service.urlNotifications().publish(body=notification).execute()
-                print(f"🚀 [AUTO-INDEX] Ping berhasil! URL telah disubmit ke Google Search.")
+                print(f"🚀 [AUTO-INDEX] Ping berhasil!")
             except Exception as idx_err:
                 print(f"⚠️ [AUTO-INDEX] Gagal submit ke Google Search: {idx_err}")
                 
@@ -202,13 +193,10 @@ def posting_ke_blogger(judul, konten_html, label_kategori):
 
 def posting_ke_facebook(judul, url_artikel):
     if not FB_ACCESS_TOKEN or not FB_PAGE_ID:
-        print("⚠️ Rahasia FB_ACCESS_TOKEN atau FB_PAGE_ID tidak ditemukan. Melewati auto-post FB.")
+        print("⚠️ Rahasia Facebook tidak ditemukan. Melewati auto-post FB.")
         return
 
-    # --- BAGIAN YANG DIUBAH (Menambahkan tulisan Sumber) ---
     pesan_status = f"🔥 Berita Terpanas Baru Saja Rilis!\n\n{judul}\n\n🔗 Sumber Berita: {url_artikel}\n\nBaca selengkapnya di link bawah ini 👇"
-    # -------------------------------------------------------
-
     url_api = f"https://graph.facebook.com/v19.0/{FB_PAGE_ID}/feed"
     payload = {
         'message': pesan_status,
@@ -231,7 +219,10 @@ def posting_ke_facebook(judul, url_artikel):
 def main():
     print("=== Memulai Auto-Blogger Sepakbola (Didukung oleh Groq AI) ===")
     
-    riwayat_postingan = ambil_riwayat_postingan()
+    # KINI HANYA MENGANDALKAN HISTORY LOKAL
+    riwayat_lokal = muat_riwayat_lokal()
+    print(f"📂 Ditemukan {len(riwayat_lokal)} riwayat di history.txt")
+    
     link_sesi_ini = set() 
     
     daftar_berita = dapatkan_berita_dari_rss(RSS_FEEDS, limit_per_sumber=2)
@@ -240,21 +231,15 @@ def main():
     for index, berita in enumerate(daftar_berita):
         print(f"\n[{index + 1}/{len(daftar_berita)}] Mengecek berita [{berita['kategori']}]: {berita['judul']}")
         
-        tag_pelacak = f""
-        link_pelacak = f'href="{berita["link"]}"'
-        
-        sudah_diposting = False
-        for konten in riwayat_postingan:
-            if tag_pelacak in konten or link_pelacak in konten:
-                sudah_diposting = True
-                break
-                
-        if sudah_diposting or (berita['link'] in link_sesi_ini):
-            print("⏩ Melewati berita: Sudah pernah diposting (Duplikat).")
+        if not berita['link'] or len(berita['link']) < 5:
+            continue
+
+        # 1. CEK HISTORY LOKAL (Mutlak)
+        if (berita['link'] in riwayat_lokal) or (berita['link'] in link_sesi_ini):
+            print("⏩ Melewati berita: Sudah diposting sebelumnya (Duplikat).")
             continue
             
         link_sesi_ini.add(berita['link'])
-
         hasil_ai = tulis_artikel_dengan_groq(berita)
         
         if hasil_ai:
@@ -262,7 +247,8 @@ def main():
             judul_baru = baris_teks[0].replace('<h1>', '').replace('</h1>', '').replace('##', '').replace('**', '').strip()
             konten_artikel = '\n'.join(baris_teks[1:]).replace('```html', '').replace('```', '')
             
-            konten_artikel = f"{tag_pelacak}\n" + konten_artikel
+            tag_pelacak = f"\n"
+            konten_artikel = tag_pelacak + konten_artikel
             
             if berita['gambar']:
                 tag_gambar = f'<div style="text-align: center; margin-bottom: 20px;"><img src="{berita["gambar"]}" alt="{judul_baru}" style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1);" /></div>\n'
@@ -277,8 +263,11 @@ def main():
 
             post_url = posting_ke_blogger(judul_baru, konten_artikel, berita['kategori'])
             
+            # Jika sukses posting ke Blogger, share ke FB lalu simpan ke history.txt
             if post_url:
                 posting_ke_facebook(judul_baru, post_url)
+                simpan_riwayat_lokal(berita['link'])
+                riwayat_lokal.add(berita['link'])
             
             print("⏳ Menunggu 20 detik sebelum memproses berita selanjutnya...")
             time.sleep(20)
