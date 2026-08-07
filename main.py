@@ -15,7 +15,9 @@ import sys
 # ==========================================
 GROQ_API_KEY = os.environ.get("GROQ_API_KEY")
 groq_client = Groq(api_key=GROQ_API_KEY)
-GROQ_MODEL = "llama3-70b-8192" 
+
+# PERBAIKAN: Menggunakan model LLaMA 3.3 terbaru yang aktif di Groq
+GROQ_MODEL = "llama-3.3-70b-versatile" 
 
 BLOG_ID = os.environ.get("BLOG_ID")
 SCOPES = ['https://www.googleapis.com/auth/blogger']
@@ -217,9 +219,8 @@ def posting_ke_facebook(judul, url_artikel):
 # 4. EKSEKUSI PROGRAM
 # ==========================================
 def main():
-    print("=== Memulai Auto-Blogger Sepakbola (Didukung oleh Groq AI) ===")
+    print("=== Memulai Auto-Blogger Sepakbola (Didukung Groq AI LLaMA 3.3) ===")
     
-    # KINI HANYA MENGANDALKAN HISTORY LOKAL
     riwayat_lokal = muat_riwayat_lokal()
     print(f"📂 Ditemukan {len(riwayat_lokal)} riwayat di history.txt")
     
